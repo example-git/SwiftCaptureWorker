@@ -8,6 +8,9 @@ to an IPC consumer, file descriptors, an MPEG-TS file, SRT, or RTMP.
 It is intended to be embedded or launched by another application, not used as a
 general-purpose screen recorder.
 
+> [!NOTE]
+> This project is a specialized fork of [GlennWong/SwiftCapture](https://github.com/GlennWong/SwiftCapture), refactored from an interactive CLI file recorder into a headless, low-latency streaming and IPC capture worker.
+
 ## Requirements
 
 - macOS 15 or later
@@ -118,3 +121,8 @@ Run `SwiftCaptureWorker --help` for the command's generated option reference.
 ```bash
 swift test
 ```
+
+## Upstream & Acknowledgements
+
+This project originated as a fork of [GlennWong/SwiftCapture](https://github.com/GlennWong/SwiftCapture) by Glenn Wong.
+
