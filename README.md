@@ -9,7 +9,7 @@ It is intended to be embedded or launched by another application, not used as a
 general-purpose screen recorder.
 
 > [!NOTE]
-> This project is a specialized fork of [GlennWong/SwiftCapture](https://github.com/GlennWong/SwiftCapture), refactored from an interactive CLI file recorder into a headless, low-latency streaming and IPC capture worker.
+> This project is a specialized fork of [GlennWong/SwiftCapture](https://github.com/GlennWong/SwiftCapture), refactored from an interactive CLI file recorder into a headless, low-latency streaming and IPC capture worker. If you are looking for a standalone CLI tool dedicated to recording directly to video files (`.mov`/`.mp4`) rather than real-time IPC/network streaming, please check out [GlennWong/SwiftCapture](https://github.com/GlennWong/SwiftCapture) instead.
 
 ## Requirements
 
@@ -124,5 +124,5 @@ swift test
 
 ## Upstream & Acknowledgements
 
-This project originated as a fork of [GlennWong/SwiftCapture](https://github.com/GlennWong/SwiftCapture) by Glenn Wong.
+This project originated as a fork of [GlennWong/SwiftCapture](https://github.com/GlennWong/SwiftCapture) by Glenn Wong. For users seeking a dedicated CLI tool to record screen and audio straight to video files on disk instead of real-time streaming pipelines, please visit the upstream repository.
 
