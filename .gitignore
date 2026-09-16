@@ -1,0 +1,33 @@
+.claude
+ai-mux-*
+.ai-cli/
+.DS_Store
+/.build
+/.kiro
+/Packages
+Package.resolved
+xcuserdata/
+DerivedData/
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.netrc
+**.mov
+**.mp4
+
+# Temp/test files
+*.log
+test.ts
+gst_ingest.py
+test_worker_gst.py
+run-worker-with-watch-server.py
+*.py
+
+# Release artifacts (dynamically generated)
+/release/
+scap-v*.tar.gz*
+swiftcapture.rb
+test-homebrew-install.sh
+start.sh
+gitconfig
+.github/copilot-instructions.md
+.github/github-app.yml

@@ -1,0 +1,87 @@
+{
+  "name": "SwiftCaptureWorker",
+  "version": "3.0.0",
+  "description": "Headless ScreenCaptureKit worker for macOS that streams H.264/AAC video and audio over IPC or broadcasts natively via SRT/RTMP",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/example-git/SwiftCaptureWorker.git"
+  },
+  "system_requirements": {
+    "macos_minimum": "15.0",
+    "swift_tools_version": "5.9",
+    "xcode_minimum": "15.0",
+    "frameworks": [
+      "ScreenCaptureKit",
+      "AVFoundation",
+      "AppKit",
+      "AudioToolbox",
+      "CoreAudio",
+      "CoreGraphics",
+      "CoreMedia",
+      "CoreVideo",
+      "VideoToolbox"
+    ],
+    "notes": [
+      "Process audio tap (--capture-process-audio) requires macOS 14.2+"
+    ]
+  },
+  "dependencies": {
+    "swift_packages": [
+      {
+        "name": "swift-argument-parser",
+        "url": "https://github.com/apple/swift-argument-parser",
+        "minimum_version": "1.2.0"
+      }
+    ],
+    "binary_targets": [
+      {
+        "name": "libsrt",
+        "url": "https://github.com/HaishinKit/libsrt-xcframework/releases/download/v1.5.4/libsrt.xcframework.zip"
+      }
+    ]
+  },
+  "build": {
+    "configuration": "release",
+    "architectures": [
+      "arm64"
+    ],
+    "product_name": "SwiftCaptureWorker",
+    "build_command": "swift build -c release",
+    "binary_path": ".build/release/SwiftCaptureWorker"
+  },
+  "distribution": {
+    "channels": [
+      "embedded-binary"
+    ],
+    "notes": "Distributed as a headless worker binary embedded in a host application's resources, not published as a standalone CLI or Homebrew package."
+  },
+  "permissions": {
+    "required": [
+      "screen_recording"
+    ],
+    "optional": [
+      "microphone",
+      "camera"
+    ]
+  },
+  "transports": [
+    "ipc-unix-socket",
+    "ipc-tcp",
+    "ipc-file-descriptors",
+    "srt",
+    "rtmp",
+    "file-dump"
+  ],
+  "features": [
+    "Display and application/window capture via ScreenCaptureKit",
+    "Webcam capture via AVFoundation as a separate H.264 stream",
+    "Hardware H.264 encoding via VideoToolbox",
+    "Hardware AAC encoding via AudioToolbox",
+    "System audio, microphone/line-in, and per-process audio tap capture",
+    "SCAP multiplexed packet protocol over Unix socket, TCP, or file descriptors",
+    "Native SRT broadcast (MPEG-TS muxing)",
+    "Native RTMP broadcast (FLV muxing)",
+    "Source discovery for displays, windows, audio devices, and webcams",
+    "Worker process discovery and info query by PID"
+  ]
+}
