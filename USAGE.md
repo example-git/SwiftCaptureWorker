@@ -1,171 +1,255 @@
-# Command-line reference
+# Command-Line & Integration Reference
 
-Run `SwiftCaptureWorker --help` for the generated reference for the version you
-built. This page explains how options fit together and provides stable examples.
+`SwiftCaptureWorker` is a headless macOS capture worker process designed to be embedded in host applications (e.g. Electron, Node.js, Python, or native macOS applications) or used for low-latency network streaming.
 
-## 1. Choose a source
+Run `SwiftCaptureWorker --help` for the auto-generated flag listing.
 
-List available displays, windows, audio inputs, processes, and webcams before
-capturing:
+> [!NOTE]
+> For a standalone CLI tool dedicated to recording directly to local video files (`.mov`/`.mp4`), refer to upstream [GlennWong/SwiftCapture](https://github.com/GlennWong/SwiftCapture).
 
+---
+
+## 1. Source Discovery & Registry Queries
+
+`SwiftCaptureWorker` provides built-in discovery options that output JSON and immediately exit.
+
+### Listing Sources
 ```bash
+# List all video, audio, and webcam sources
 SwiftCaptureWorker --list-sources
+
+# Filter by category
 SwiftCaptureWorker --list-sources --source-kind video
 SwiftCaptureWorker --list-sources --source-kind audio
 ```
 
-Choose one screen or window source:
+The returned JSON structure:
+```json
+{
+  "video": {
+    "displays": [
+      {
+        "index": 1,
+        "displayID": 1,
+        "electronSourceId": "screen:1:0",
+        "name": "Built-in Retina Display",
+        "isPrimary": true,
+        "frame": { "x": 0, "y": 0, "width": 1728, "height": 1117 },
+        "scaleFactor": 2.0
+      }
+    ],
+    "applications": [
+      {
+        "name": "Safari",
+        "bundleIdentifier": "com.apple.Safari",
+        "processID": 1234,
+        "windows": [
+          {
+            "windowID": 5678,
+            "electronSourceId": "window:5678:0",
+            "title": "GitHub — SwiftCaptureWorker",
+            "frame": { "x": 100, "y": 100, "width": 1200, "height": 800 },
+            "isOnScreen": true
+          }
+        ]
+      }
+    ]
+  },
+  "audio": {
+    "systemAudioSupported": true,
+    "inputDevices": [
+      {
+        "name": "MacBook Pro Microphone",
+        "uniqueID": "BuiltInMicrophoneDevice",
+        "modelID": "AppleHDAEngineInput:1",
+        "connected": true
+      }
+    ],
+    "processes": [
+      {
+        "name": "Music",
+        "bundleIdentifier": "com.apple.Music",
+        "processID": 2345,
+        "processIDs": [2345],
+        "bundleIdentifiers": ["com.apple.Music"],
+        "processObjectCount": 1
+      }
+    ]
+  },
+  "webcams": [
+    {
+      "name": "FaceTime HD Camera",
+      "uniqueID": "0x1410000005ac8514",
+      "modelID": "Apple Camera",
+      "connected": true,
+      "formats": [
+        { "width": 1920, "height": 1080, "minFPS": 1.0, "maxFPS": 60.0 }
+      ]
+    }
+  ]
+}
+```
 
-| Option | Meaning |
-| --- | --- |
-| `--screen-index <n>` | 1-based display index; defaults to `1`. |
-| `--app-name <name>` | Case-insensitive application-name match. |
-| `--app-bundle-id <id>` | Exact application bundle identifier. |
-| `--source-id <id>` | ID returned by `--list-sources`: `screen:DISPLAY_ID:0` or `window:WINDOW_ID:0`. |
-| `--area x:y:width:height` | Display-local crop rectangle; cannot be used with application capture. |
+### Worker Process Registry Queries
+Active workers automatically register themselves in `/tmp/swiftcapture-registry-<pid>.json`:
+```bash
+# List all active workers on the machine
+SwiftCaptureWorker --list-workers
 
-Use either `--app-name` or `--app-bundle-id`, not both. A source ID takes
-precedence over the normal screen and bundle-ID selection.
+# Query snapshot details of a specific worker by PID
+SwiftCaptureWorker --info-pid <pid>
+```
 
-To capture a webcam, use `--capture-webcam`. Select a camera with
-`--webcam-device-id`, and optionally set `--webcam-fps`,
-`--webcam-width`, and `--webcam-height`. Width and height must be provided
-together.
+---
 
-## 2. Choose audio
+## 2. Choosing Video & Audio Sources
 
-Audio is opt-in:
+### Display & Window Capture
+| Option | Description |
+| :--- | :--- |
+| `--screen-index <n>` | 1-based display index (default: `1`). |
+| `--app-name <name>` | Case-insensitive application name match for window capture. |
+| `--app-bundle-id <id>` | Exact bundle identifier (e.g. `com.apple.Safari`). |
+| `--source-id <id>` | Electron-compatible source ID (`screen:DISPLAY_ID:0` or `window:WINDOW_ID:0`). Supersedes `--screen-index` and `--app-bundle-id`. |
+| `--area x:y:w:h` | Display-relative crop rectangle (cannot be used with application capture). |
+| `--show-cursor` | Include cursor pointer in screen capture. |
+| `--no-video` | Disables screen capture (must be used with audio or webcam capture). |
 
-| Option | Meaning |
-| --- | --- |
-| `--capture-system-audio` | Capture system output through ScreenCaptureKit. |
-| `--capture-input-audio` | Capture the default microphone or input device. |
-| `--input-device-id <id>` | Select an input device listed by `--list-sources`. |
-| `--capture-process-audio` | Capture one process's output on macOS 14.2 or later. |
-| `--audio-tap-pid <pid>` | Select the process-audio target by PID. |
-| `--audio-tap-app <name>` | Select the process-audio target by application name or partial bundle ID. |
+### Webcam Capture (AVFoundation)
+| Option | Description |
+| :--- | :--- |
+| `--capture-webcam` | Captures webcam video as a secondary H.264 stream (`stream_id 4`). |
+| `--webcam-device-id <id>` | Specific webcam unique ID from `--list-sources`. |
+| `--webcam-fps <fps>` | Target FPS for webcam capture (default: `60`). |
+| `--webcam-width <w>`, `--webcam-height <h>` | Dimensions for webcam capture (must specify both). |
 
-Process-audio capture requires exactly one of `--audio-tap-pid` and
-`--audio-tap-app`.
+### Audio Capture
+Audio is strictly opt-in:
+| Option | Description |
+| :--- | :--- |
+| `--capture-system-audio` | Capture system audio output through ScreenCaptureKit. |
+| `--capture-input-audio` | Capture microphone or line-in via CoreAudio. |
+| `--input-device-id <id>` | Select specific microphone device by unique ID. |
+| `--capture-process-audio` | Tap specific application audio (macOS 14.2+). |
+| `--audio-tap-pid <pid>` | Target process by numeric PID. |
+| `--audio-tap-app <name>` | Target process by application name or partial bundle ID. |
 
-For audio-only capture, add `--no-video` and at least one audio capture option.
+---
 
-## 3. Choose an output
+## 3. Output Transports
 
-Pick one primary media destination.
-
-### File descriptors
-
-This is the default for application integrations that spawn the worker. Video
-uses stdout (`--video-fd 1`) by default. Give each additional active stream a
-different file descriptor:
+### Mode A: Dedicated File Descriptors
+Best for parent processes spawning `SwiftCaptureWorker` via pipes. Each stream writes framing packets adhering to the [SCAP protocol](PROTOCOL.md).
 
 ```bash
 SwiftCaptureWorker \
   --screen-index 1 \
+  --video-fd 1 \
   --capture-system-audio --system-audio-fd 3 \
-  --capture-input-audio --input-audio-fd 4
+  --capture-input-audio --input-audio-fd 4 \
+  --control-fd 5
 ```
 
-Related options are `--video-fd`, `--system-audio-fd`, `--input-audio-fd`,
-`--process-audio-fd`, and `--webcam-video-fd`. These outputs are SCAP packets,
-not raw codec payloads. Read [PROTOCOL.md](PROTOCOL.md) before consuming them.
+- `--video-fd <fd>`: Screen video stream (`stream_id 0`, default: `1` / stdout).
+- `--system-audio-fd <fd>`: System audio stream (`stream_id 1`).
+- `--input-audio-fd <fd>`: Input device/microphone stream (`stream_id 2`).
+- `--process-audio-fd <fd>`: Per-process audio tap stream (`stream_id 3`).
+- `--webcam-video-fd <fd>`: Webcam video stream (`stream_id 4`).
+- `--control-fd <fd>`: Inbound control channel for master stop commands.
 
-### Multiplexed IPC
+#### Interactive Control Channel (`--control-fd`)
+The parent process can pass a dedicated file descriptor to gracefully control the worker:
+- Write `"stop\n"` or `{"command": "stop"}\n` to the control FD to initiate graceful shutdown.
+- Closing the control FD also signals the worker to cleanly terminate.
 
-Use a Unix-domain socket or localhost TCP listener when one consumer should
-receive every active stream on a single connection:
+### Mode B: Multiplexed IPC (Socket or TCP)
+When a single connection is preferred, the worker acts as a client and connects to a pre-existing Unix Domain Socket or TCP listener. All streams are multiplexed across the single connection using SCAP headers.
 
 ```bash
-# Start your listener before launching the worker.
+# Connect to Unix domain socket
 SwiftCaptureWorker \
   --screen-index 1 \
   --capture-system-audio \
   --ipc-socket /tmp/swiftcapture.sock
-```
 
-```bash
+# Connect to localhost TCP port
 SwiftCaptureWorker \
   --screen-index 1 \
   --capture-system-audio \
   --ipc-port 9876
 ```
 
-The worker is the client: it connects to the socket path or to
-`127.0.0.1:<port>`. IPC output cannot be combined with per-stream file
-descriptors. Packets from all streams are multiplexed using their SCAP
-`stream_id`.
-
-### File, SRT, and RTMP
-
-Use one of these destinations for directly usable media output:
+### Mode C: Native Broadcast (SRT / RTMP)
+Broadcast directly to media servers without needing external relay software:
 
 ```bash
-# Write a local MPEG-TS file.
+# Native SRT Broadcast (muxed into MPEG-TS container)
 SwiftCaptureWorker \
   --screen-index 1 \
   --capture-system-audio \
-  --duration-ms 10000 \
-  --dump-output capture.ts
+  --srt-url "srt://live.example.com:9000?streamid=publish/stream1" \
+  --srt-latency-ms 120
 
-# Publish MPEG-TS over SRT.
+# Native RTMP Broadcast (muxed into FLV tags)
 SwiftCaptureWorker \
   --screen-index 1 \
   --capture-system-audio \
-  --srt-url "srt://relay.example.com:9000?streamid=publish/live"
+  --rtmp-url "rtmp://live.example.com/live/stream-key"
+```
 
-# Publish FLV over RTMP.
+### Mode D: Local MPEG-TS Dump (Inspection)
+```bash
 SwiftCaptureWorker \
   --screen-index 1 \
   --capture-system-audio \
-  --rtmp-url "rtmp://live.example.com/app/stream-key"
+  --duration-ms 5000 \
+  --dump-output test-recording.ts
 ```
 
-`--dump-output`, `--srt-url`, and `--rtmp-url` are mutually exclusive. SRT
-also accepts `--srt-latency-ms` and `--srt-stream-id`. `--premux` is an
-experimental local pre-mux mode; use `--dump-output` when you need a named,
-portable output file.
+---
 
-## 4. Tune video
+## 4. Video & Encoder Tuning
 
-| Option | Default | Constraints |
-| --- | --- | --- |
-| `--fps <n>` | `60` | Screen capture accepts `15`, `30`, or `60`. |
-| `--bitrate <bps>` | Encoder default | Must be greater than zero. |
-| `--keyframe-interval <frames>` | `fps * 2` | Maximum interval between keyframes. |
-| `--output-width`, `--output-height` | Source size | Specify both; each must be at least 128. |
-| `--show-cursor` | Off | Includes the mouse pointer. |
-| `--duration-ms <n>` | Unlimited | At least 100 milliseconds. |
+| Option | Default | Description |
+| :--- | :--- | :--- |
+| `--fps <n>` | `60` | Frame rate for screen capture (`15`, `30`, or `60`). |
+| `--bitrate <bps>` | Hardware default | Target H.264 video bitrate in bits per second (e.g. `6000000` for 6 Mbps). |
+| `--keyframe-interval <n>`| `fps * 2` | Maximum keyframe interval in frames. |
+| `--output-width <w>`, `--output-height <h>` | Source resolution | Downscales video hardware encoder output. Both must be provided and >= 128. |
+| `--duration-ms <ms>` | Unlimited | Stop automatically after the specified time in milliseconds. |
 
-Example: crop, scale, and write a short test recording:
+---
 
+## 5. Consumer Integration Examples
+
+### Node.js / Electron Parent Integration (File Descriptors)
+```javascript
+import { spawn } from 'child_process';
+
+const worker = spawn('./SwiftCaptureWorker', [
+  '--screen-index', '1',
+  '--video-fd', '1',
+  '--capture-system-audio',
+  '--system-audio-fd', '3',
+  '--control-fd', '4'
+], {
+  stdio: [
+    'ignore',    // stdin
+    'pipe',      // stdout (fd 1: video SCAP packets)
+    'inherit',   // stderr (worker logs)
+    'pipe',      // fd 3: audio SCAP packets
+    'pipe'       // fd 4: control channel
+  ]
+});
+
+// To stop worker gracefully:
+worker.stdio[4].write('stop\n');
+```
+
+### Inspecting MPEG-TS Stream via ffplay
 ```bash
 SwiftCaptureWorker \
   --screen-index 1 \
-  --area 0:0:2560:1440 \
-  --output-width 1920 --output-height 1080 \
-  --fps 30 \
-  --duration-ms 10000 \
-  --dump-output capture.ts
+  --capture-system-audio \
+  --dump-output - | ffplay -
 ```
-
-## Discovery and worker registry
-
-These commands print JSON and exit:
-
-```bash
-SwiftCaptureWorker --list-workers
-SwiftCaptureWorker --info-pid 12345
-```
-
-## Validation rules
-
-- `--ipc-socket` and `--ipc-port` cannot be used together.
-- A socket or TCP destination cannot be combined with per-stream file
-  descriptors.
-- All active file descriptors must be distinct.
-- System, input, and process audio require a matching file descriptor unless
-  IPC, file, SRT, or RTMP output is selected.
-- Webcam and input-audio output follows the same rule, with `--premux` also
-  accepted for those two streams.
-- `--no-video` requires an audio or webcam capture option.
