@@ -43,6 +43,17 @@ private func audioConverterInputProcLog(_ audioBufferList: AudioBufferList) {
 }
 
 
+// ==============================================================================
+// WARNING: Custom AudioToolbox AAC Encoder (FRAGILE — HANDLE WITH CARE)
+//
+// This encoder performs PCM to AAC conversion using AudioConverter with exact
+// 90 kHz rational tick accumulation (1024 * 90_000 / sampleRate) and priming
+// delay compensation. It ensures sub-millisecond, drift-free alignment with the
+// video stream over hours of capture.
+//
+// Avoid modifying this encoder unless addressing a verified hardware-level bug.
+// ==============================================================================
+
 /// AAC audio encoder that converts PCM to ADTS-framed AAC using AudioConverter.
 final class AACEncoder: @unchecked Sendable {
     private let lock = NSLock()

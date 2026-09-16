@@ -2,6 +2,16 @@ import Foundation
 import CoreMedia
 import CoreVideo
 import VideoToolbox
+// ==============================================================================
+// WARNING: Custom Hardware VideoToolbox Encoder (FRAGILE — HANDLE WITH CARE)
+//
+// This component manages the low-latency VideoToolbox session lifecycle, in-place
+// H.264 SPS/VUI bitstream rewriting (injecting BT.709 colorimetry and timing),
+// and 90 kHz PTS cadence self-calibration. It contains delicate lock hierarchies,
+// unmanaged refcon pointer balancing, and RBSP emulation-prevention parsing.
+//
+// Avoid modifying this encoder unless addressing a verified hardware-level bug.
+// ==============================================================================
 
 final class H264Encoder: @unchecked Sendable {
     private var session: VTCompressionSession?

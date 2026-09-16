@@ -107,7 +107,35 @@ AAC streams. Use the protocol document to implement a consumer.
 - Hardware H.264 encoding through VideoToolbox
 
 `--capture-webcam` captures a webcam stream and can be combined with supported
-audio sources.
+## Custom Encoders & Architecture (Fragile — Handle With Care)
+
+> [!WARNING]
+> The custom hardware encoder pipelines in `H264Encoder.swift` and `AACEncoder.swift` contain low-level VideoToolbox, AudioToolbox, and bitstream manipulation routines that are tightly coupled to hardware constraints and real-time streaming requirements. They are **fragile** and should generally be **left alone** unless fixing a verified hardware-specific bug.
+
+Key invariants and architectural details include:
+
+1. **In-Place SPS/VUI Bitstream Rewriting (`H264Encoder.swift`)**:
+   - Standard VideoToolbox output omits required VUI (Video Usability Information) timing and colorimetry parameters.
+   - The encoder parses the raw Exponential-Golomb encoded Sequence Parameter Set (SPS) RBSP, strips emulation prevention bytes (`0x00 0x00 0x03`), and directly injects BT.709 color primaries, full/video color range flags, and fixed frame-rate timing before re-inserting emulation prevention bytes.
+   - *Risk:* Subtle errors in bit-level RBSP manipulation will corrupt NAL units, crash downstream hardware decoders, or produce washed-out/green video artifacts.
+
+2. **VideoToolbox Lifecycle & Deadlock Constraints**:
+   - The encoder uses unmanaged `refcon` pointers (`Unmanaged.passRetained(self)`) with strict manual retain/release semantics.
+   - Periodic buffer draining via `flush()` is mandatory: without it, VideoToolbox accumulates intermediate frame metadata in heap memory at ~5–6 MB per minute at 60 fps.
+   - `flush()` invokes `VTCompressionSessionCompleteFrames` *outside* the instance lock to drain buffers. Calling `CompleteFrames` while holding the lock causes an immediate deadlock with the asynchronous compression callback.
+
+3. **90 kHz PTS Quantization & Fractional Cadence Self-Calibration**:
+   - Video and audio timestamps are quantized onto the standard 90 kHz MPEG-TS/RTMP timescale.
+   - Physical displays and webcams often produce fractional frame intervals (e.g. 59.94 Hz or Apple ProMotion variable rates). Using fixed `1/fps` spacing causes severe A/V sync drift over time.
+   - `H264Encoder` observes input timestamp deltas over the first 30 frames to calculate the median physical frame duration and locks cadence smoothly.
+   - `AACEncoder` uses an exact rational tick accumulator (`1024 * 90_000 / sampleRate`) carrying fractional remainders forward to achieve mathematically zero A/V drift over long sessions.
+
+4. **AVCC to Annex-B Conversion**:
+   - VideoToolbox emits length-prefixed AVCC samples in `CMBlockBuffer` memory.
+   - The encoder converts AVCC into Annex-B 4-byte start codes (`00 00 00 01`) and ensures valid SPS/PPS parameter sets precede every IDR keyframe.
+
+5. **Audio Priming Delay Compensation (`AACEncoder.swift`)**:
+   - Apple's `AudioConverter` introduces hardware priming delays. `AACEncoder` queries `kAudioConverterPrimeInfo` and subtracts priming ticks so audio frames align precisely with video start times.
 
 ## Documentation
 
